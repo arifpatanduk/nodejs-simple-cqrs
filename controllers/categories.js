@@ -1,72 +1,96 @@
-const { Category } = require("../models");
+const { Category, sequelize } = require("../models");
 const { writeOutbox } = require("../helpers/outbox");
 const esClient = require("../config/elastic");
 
 // POST /api/categories
 async function createCategory(req, res) {
+  const { name, description } = req.body;
   try {
-    const { name, description } = req.body;
+    const result = await sequelize.transaction(async (t) => {
+      const newCategory = await Category.create(
+        { name, description },
+        { transaction: t }
+      );
 
-    const newCategory = await Category.create({ name, description });
+      await writeOutbox(
+        {
+          aggregatetype: "category",
+          aggregateid: newCategory.id,
+          type: "CATEGORY_CREATED",
+          payload: newCategory.toJSON(),
+        },
+        t
+      );
 
-    await writeOutbox({
-      aggregatetype: "category",
-      aggregateid: newCategory.id,
-      type: "CATEGORY_CREATED",
-      payload: newCategory.toJSON(),
+      return newCategory;
     });
 
-    res.status(201).json(newCategory);
-  } catch (err) {
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Create Category Error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
 
 // PUT /api/categories/:id
 async function updateCategory(req, res) {
+  const { id } = req.params;
+  const { name, description } = req.body;
+
   try {
-    const { id } = req.params;
-    const { name, description } = req.body;
+    const result = await sequelize.transaction(async (t) => {
+      const category = await Category.findByPk(id, { transaction: t });
+      if (!category) throw new Error("Category not found");
 
-    const category = await Category.findByPk(id);
-    if (!category)
-      return res.status(404).json({ message: "Category not found" });
+      await category.update({ name, description }, { transaction: t });
 
-    await category.update({ name, description });
+      await writeOutbox(
+        {
+          aggregatetype: "category",
+          aggregateid: id,
+          type: "CATEGORY_UPDATED",
+          payload: category.toJSON(),
+        },
+        t
+      );
 
-    await writeOutbox({
-      aggregatetype: "category",
-      aggregateid: category.id,
-      type: "CATEGORY_UPDATED",
-      payload: category.toJSON(),
+      return category;
     });
 
-    res.json(category);
-  } catch (err) {
+    res.json(result);
+  } catch (error) {
+    console.error("Update Category Error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
 
 // DELETE /api/categories/:id
 async function deleteCategory(req, res) {
+  const { id } = req.params;
+
   try {
-    const { id } = req.params;
+    const result = await sequelize.transaction(async (t) => {
+      const category = await Category.findByPk(id, { transaction: t });
+      if (!category) throw new Error("Category not found");
 
-    const category = await Category.findByPk(id);
-    if (!category)
-      return res.status(404).json({ message: "Category not found" });
+      await category.destroy({ transaction: t });
 
-    await category.destroy();
+      await writeOutbox(
+        {
+          aggregatetype: "category",
+          aggregateid: id,
+          type: "CATEGORY_DELETED",
+          payload: { id },
+        },
+        t
+      );
 
-    await writeOutbox({
-      aggregatetype: "category",
-      aggregateid: id,
-      type: "CATEGORY_DELETED",
-      payload: { id },
+      return category;
     });
 
     res.json({ message: "Category deleted successfully" });
-  } catch (err) {
+  } catch (error) {
+    console.error("Delete Category Error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 }
