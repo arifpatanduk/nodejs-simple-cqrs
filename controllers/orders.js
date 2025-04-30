@@ -44,9 +44,9 @@ async function createOrder(req, res) {
       await order.update({ totalAmount }, { transaction: t });
 
       await writeOutbox({
-        aggregatetype: "order",
+        aggregatetype: "orders",
         aggregateid: order.id,
-        type: "ORDER_CREATED",
+        type: "INSERT",
         payload: {
           id: order.id,
           items: createdItems,
@@ -89,9 +89,9 @@ async function updateOrderStatus(req, res) {
       await order.update({ status }, { transaction: t });
 
       await writeOutbox({
-        aggregatetype: "order",
+        aggregatetype: "orders",
         aggregateid: order.id,
-        type: "ORDER_STATUS_UPDATED",
+        type: "UPDATE",
         payload: {
           id: order.id,
           status: order.status,

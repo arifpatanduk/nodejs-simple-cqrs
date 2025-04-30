@@ -14,10 +14,10 @@ async function createCategory(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "category",
+          aggregatetype: "categories",
           aggregateid: newCategory.id,
-          type: "CATEGORY_CREATED",
-          payload: newCategory.toJSON(),
+          type: "INSERT",
+          payload: newCategory,
         },
         t
       );
@@ -46,10 +46,10 @@ async function updateCategory(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "category",
+          aggregatetype: "categories",
           aggregateid: id,
-          type: "CATEGORY_UPDATED",
-          payload: category.toJSON(),
+          type: "UPDATE",
+          payload: mapCategoryPayload(category),
         },
         t
       );
@@ -77,9 +77,9 @@ async function deleteCategory(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "category",
+          aggregatetype: "categories",
           aggregateid: id,
-          type: "CATEGORY_DELETED",
+          type: "DELETE",
           payload: { id },
         },
         t
@@ -97,13 +97,14 @@ async function deleteCategory(req, res) {
 
 async function getCategories(req, res) {
   try {
-    const { body } = await esClient.search({
-      index: "categories",
+    const result = await esClient.search({
+      index: "ecommerce.categories",
       query: { match_all: {} },
       size: 1000,
     });
 
-    const categories = body.hits.hits.map((hit) => hit._source);
+    // In ES v8+, hits are at result.hits.hits
+    const categories = result.hits.hits.map((hit) => hit._source);
     res.json({ data: categories });
   } catch (err) {
     console.error(err);

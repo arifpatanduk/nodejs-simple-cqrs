@@ -24,9 +24,9 @@ async function createProduct(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "product",
+          aggregatetype: "products",
           aggregateid: newProduct.id,
-          type: "PRODUCT_CREATED",
+          type: "INSERT",
           payload: newProduct.toJSON(),
         },
         t
@@ -67,9 +67,9 @@ async function updateProduct(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "product",
+          aggregatetype: "products",
           aggregateid: product.id,
-          type: "PRODUCT_UPDATED",
+          type: "UPDATE",
           payload: product.toJSON(),
         },
         t
@@ -98,7 +98,7 @@ async function deleteProduct(req, res) {
 
       await writeOutbox(
         {
-          aggregatetype: "product",
+          aggregatetype: "products",
           aggregateid: id,
           type: "PRODUCT_DELETED",
           payload: { id },
