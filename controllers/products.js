@@ -152,18 +152,18 @@ async function getProducts(req, res) {
       },
     };
 
-    const { body } = await esClient.search({
-      index: "products",
+    const result = await esClient.search({
+      index: "ecommerce.products",
       from,
       size: limit,
-      sort: [`${sortBy}:desc`],
+      sort: [{ [sortBy]: { order: "desc" } }],
       query,
     });
 
-    const hits = body.hits.hits.map((hit) => hit._source);
+    const hits = result.hits.hits.map((hit) => hit._source);
 
     res.json({
-      total: body.hits.total.value,
+      total: result.hits.total.value,
       page: Number(page),
       limit: Number(limit),
       data: hits,
@@ -178,9 +178,9 @@ async function getProducts(req, res) {
 async function getProductById(req, res) {
   try {
     const { id } = req.params;
-    const { body } = await esClient.get({ index: "products", id });
+    const result = await esClient.get({ index: "ecommerce.products", id });
 
-    res.json(body._source);
+    res.json(result._source);
   } catch (err) {
     if (err.meta?.statusCode === 404) {
       res.status(404).json({ message: "Product not found" });
