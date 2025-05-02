@@ -49,7 +49,7 @@ async function updateCategory(req, res) {
           aggregatetype: "categories",
           aggregateid: id,
           type: "UPDATE",
-          payload: mapCategoryPayload(category),
+          payload: category,
         },
         t
       );
@@ -80,7 +80,7 @@ async function deleteCategory(req, res) {
           aggregatetype: "categories",
           aggregateid: id,
           type: "DELETE",
-          payload: { id },
+          payload: null,
         },
         t
       );

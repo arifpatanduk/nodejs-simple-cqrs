@@ -18,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       aggregateid: {
-        type: DataTypes.STRING,
+        type: DataTypes.INTEGER,
         allowNull: false,
       },
       type: {
@@ -27,7 +27,8 @@ module.exports = (sequelize, DataTypes) => {
       },
       payload: {
         type: DataTypes.JSON,
-        allowNull: false,
+        allowNull: null,
+        defaultValue: null,
       },
     },
     {
