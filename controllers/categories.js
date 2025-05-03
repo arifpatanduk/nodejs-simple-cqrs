@@ -95,17 +95,50 @@ async function deleteCategory(req, res) {
   }
 }
 
+// GET categories from MySQL
+async function getCategoriesMysql(req, res) {
+  try {
+    const { page = 1, limit = 1000 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const { count, rows } = await Category.findAndCountAll({
+      offset: Number(offset),
+      limit: Number(limit),
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({
+      total: count,
+      page: Number(page),
+      limit: Number(limit),
+      data: rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch categories" });
+  }
+}
+
+// GET categories from Elasticsearch
 async function getCategories(req, res) {
   try {
+    const { page = 1, limit = 1000 } = req.query;
+    const from = (page - 1) * limit;
+
     const result = await esClient.search({
       index: "ecommerce.categories",
       query: { match_all: {} },
-      size: 1000,
+      from,
+      size: Number(limit),
     });
 
-    // In ES v8+, hits are at result.hits.hits
     const categories = result.hits.hits.map((hit) => hit._source);
-    res.json({ data: categories });
+    res.json({
+      total: result.hits.total.value,
+      page: Number(page),
+      limit: Number(limit),
+      data: categories,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch categories" });
@@ -117,4 +150,5 @@ module.exports = {
   updateCategory,
   deleteCategory,
   getCategories,
+  getCategoriesMysql,
 };

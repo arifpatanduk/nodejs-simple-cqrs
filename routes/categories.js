@@ -7,5 +7,6 @@ router.put("/:id", categoryController.updateCategory);
 router.delete("/:id", categoryController.deleteCategory);
 
 router.get("/", categoryController.getCategories);
+router.get("/mysql", categoryController.getCategoriesMysql);
 
 module.exports = router;
