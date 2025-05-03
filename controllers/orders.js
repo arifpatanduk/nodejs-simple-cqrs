@@ -1,6 +1,7 @@
 const { Order, OrderItem, Product, sequelize } = require("../models");
 const { writeOutbox } = require("../helpers/outbox");
 const esClient = require("../config/elastic");
+const { Op } = require("sequelize"); // <-- Add this line
 
 // POST /api/orders
 async function createOrder(req, res) {
@@ -112,16 +113,15 @@ async function updateOrderStatus(req, res) {
 // GET /api/orders
 async function getOrders(req, res) {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10000, status } = req.query;
     const from = (page - 1) * limit;
 
     const filters = status ? [{ term: { status } }] : [];
 
-    const { body } = await esClient.search({
-      index: "orders",
+    const result = await esClient.search({
+      index: "ecommerce.orders",
       from,
       size: limit,
-      sort: ["createdAt:desc"],
       query: {
         bool: {
           must: [{ match_all: {} }],
@@ -130,13 +130,54 @@ async function getOrders(req, res) {
       },
     });
 
-    const orders = body.hits.hits.map((hit) => hit._source);
+    const orders = result.hits.hits.map((hit) => hit._source);
 
     res.json({
-      total: body.hits.total.value,
+      total: result.hits.total.value,
       page: Number(page),
       limit: Number(limit),
-      data: orders,
+      // data: orders,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch orders" });
+  }
+}
+
+// GET /api/orders/mysql
+async function getOrdersMysql(req, res) {
+  try {
+    const { page = 1, limit = 10000, status } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {};
+    if (status) whereClause.status = status;
+
+    const { rows } = await Order.findAndCountAll({
+      where: whereClause,
+      offset: Number(offset),
+      limit: Number(limit),
+      order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: OrderItem,
+          as: "orderItems",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "price"],
+            },
+          ],
+        },
+      ],
+    });
+
+    res.json({
+      total: rows.length, // Only count the current page's data
+      page: Number(page),
+      limit: Number(limit),
+      // data: rows,
     });
   } catch (err) {
     console.error(err);
@@ -148,7 +189,7 @@ async function getOrders(req, res) {
 async function getOrderById(req, res) {
   try {
     const { id } = req.params;
-    const { body } = await esClient.get({ index: "orders", id });
+    const { body } = await esClient.get({ index: "ecommerce.orders", id });
 
     res.json(body._source);
   } catch (err) {
@@ -165,5 +206,6 @@ module.exports = {
   createOrder,
   updateOrderStatus,
   getOrders,
+  getOrdersMysql,
   getOrderById,
 };
