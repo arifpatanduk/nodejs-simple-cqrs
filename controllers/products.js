@@ -2,6 +2,7 @@ const { Product, Category, sequelize } = require("../models");
 const { writeOutbox } = require("../helpers/outbox");
 const { v4: uuidv4 } = require("uuid");
 const esClient = require("../config/elastic");
+const { Op } = require("sequelize");
 
 // CREATE product
 async function createProduct(req, res) {
@@ -22,12 +23,27 @@ async function createProduct(req, res) {
         { transaction: t }
       );
 
+      // Fetch category details
+      const category = await Category.findByPk(categoryId, { transaction: t });
+
+      // Build payload with nested category data
+      const payload = {
+        ...newProduct.toJSON(),
+        category: category
+          ? {
+              id: category.id,
+              name: category.name,
+              description: category.description,
+            }
+          : null,
+      };
+
       await writeOutbox(
         {
           aggregatetype: "products",
           aggregateid: newProduct.id,
           type: "INSERT",
-          payload: newProduct.toJSON(),
+          payload,
         },
         t
       );
@@ -65,12 +81,29 @@ async function updateProduct(req, res) {
         { transaction: t }
       );
 
+      // Fetch category details
+      const category = await Category.findByPk(product.categoryId, {
+        transaction: t,
+      });
+
+      // Build payload with nested category data
+      const payload = {
+        ...product.toJSON(),
+        category: category
+          ? {
+              id: category.id,
+              name: category.name,
+              description: category.description,
+            }
+          : null,
+      };
+
       await writeOutbox(
         {
           aggregatetype: "products",
           aggregateid: product.id,
           type: "UPDATE",
-          payload: product.toJSON(),
+          payload,
         },
         t
       );
@@ -100,8 +133,8 @@ async function deleteProduct(req, res) {
         {
           aggregatetype: "products",
           aggregateid: id,
-          type: "PRODUCT_DELETED",
-          payload: { id },
+          type: "DELETE",
+          payload: null,
         },
         t
       );
@@ -119,7 +152,7 @@ async function getProducts(req, res) {
   try {
     const {
       page = 1,
-      limit = 10,
+      limit = 10000,
       sortBy = "createdAt",
       category,
       minPrice,
@@ -174,6 +207,60 @@ async function getProducts(req, res) {
   }
 }
 
+// GET /api/products/mysql
+async function getProductsMysql(req, res) {
+  try {
+    const {
+      page = 1,
+      limit = 10000,
+      sortBy = "createdAt",
+      category,
+      minPrice,
+      maxPrice,
+      search,
+    } = req.query;
+    const offset = (page - 1) * limit;
+
+    const whereClause = {};
+    if (category) whereClause.categoryId = category;
+    if (minPrice || maxPrice) {
+      whereClause.price = {};
+      if (minPrice) whereClause.price[Op.gte] = parseFloat(minPrice);
+      if (maxPrice) whereClause.price[Op.lte] = parseFloat(maxPrice);
+    }
+    if (search) {
+      whereClause[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const { count, rows } = await Product.findAndCountAll({
+      where: whereClause,
+      offset: Number(offset),
+      limit: Number(limit),
+      order: [[sortBy, "DESC"]],
+      include: [
+        {
+          model: Category,
+          as: "category", // <-- Add this line to match the alias in your association
+          attributes: ["id", "name", "description"],
+        },
+      ],
+    });
+
+    res.json({
+      total: count,
+      page: Number(page),
+      limit: Number(limit),
+      data: rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch products" });
+  }
+}
+
 // GET /api/products/:id
 async function getProductById(req, res) {
   try {
@@ -196,5 +283,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getProducts,
+  getProductsMysql,
   getProductById,
 };
